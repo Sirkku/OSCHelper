@@ -1,0 +1,1 @@
+pyinstaller -F -i resources\BUNY.png main.py
