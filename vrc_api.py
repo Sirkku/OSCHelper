@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Optional, Callable
 
 import vrchatapi
-from PyQt6.QtCore import QObject, pyqtSignal, QUrl
+from PyQt6.QtCore import QObject, pyqtSignal, QUrl, pyqtBoundSignal
 from PyQt6.QtGui import QImage
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
@@ -16,34 +17,26 @@ class AvatarData:
     def __init__(self):
         self.id: str = ""
         self.name: str = ""
-        self.img: QImage | None = None
+        self.img: Optional[QImage] = None
 
 
 class VRCApiService(QObject):
-    """
-    This class provides an interface for accessing the VRC API.
-    """
     # signals
-    logged_in = pyqtSignal()
-
-    class Login2FAVersion(Enum):
-        NONE = 0
-        EMAIL_2FA = 1
-        EXTERNAL_2FA = 2
+    logged_in: pyqtBoundSignal = pyqtSignal(bool)
 
     def __init__(self, network_manager):
         super(QObject, self).__init__()
-        self.api_client = None
-        self.current_user = None
-        self.user_agent = "OSC Helper Kvn7604"
-        self.client_config = vrchatapi.Configuration()
-        self.requested_2fa = VRCApiService.Login2FAVersion.NONE
+        self.api_client: Optional[vrchatapi.ApiClient] = None
+        self.current_user: Optional[dict] = None
+        self.user_agent: str = "OSC Helper Kvn7604"
+        self.client_config: vrchatapi.Configuration = vrchatapi.Configuration()
         self.network_manager: QNetworkAccessManager = network_manager
 
     def interactive_login_user(self):
         """
         Tries to log in the user. On success emits self.logged_in.
-        Silences all excpetions deemed to only have been caused by wrong Username/Password/2FA Code input,
+        Silences all exceptions deemed to only have been caused by wrong
+        Username/Password/2FA Code input,
         the rest are passed through.
         :return:
         """
@@ -72,15 +65,18 @@ class VRCApiService(QObject):
                             QInputDialog().getText(None, "2FA Code", "Enter")[0]
                         ))
                 except vrchatapi.exceptions.ApiException as _:
+                    self.logged_in.emit(False)
                     return
                 current_user = auth_api.get_current_user()
             else:
                 # failure wasn't related to 2FA?
+
                 QMessageBox.warning(None, "Error while logging in:", "{}".format(str(e)))
                 return
         except vrchatapi.ApiException as e:
             # failure wasn't related to logging in?
             QMessageBox.warning(None, "Error while logging in:", "{}".format(str(e)))
+            self.logged_in.emit(False)
             return
         self.current_user = current_user
         self.api_client = new_api_client
@@ -92,19 +88,33 @@ class VRCApiService(QObject):
             self.current_user = auth_client.get_current_user()
         return self.current_user
 
-    def get_avatar_stuff(self, avatar_id, callback) -> None:
+    def get_avatar_stuff(self, avatar_id, callback: Callable[[AvatarData], None]) -> None:
+        """
+        requires a successful call of self.interactive_login_user() before this
+        works. Otherwise, this will throw a bunch of exceptions related to not
+        being authenticated.
+        callback is called after all network communication (avatar json, icon)
+        is finished. If the image fetching didn't work, AvatarData.img might
+        be None
+        """
         result: AvatarData = AvatarData()
-        result.id = avatar_id
-
         avatar_api = vrchatapi.AvatarsApi(self.api_client)
         avatar_data = avatar_api.get_avatar(avatar_id)
 
         result.name = avatar_data.name
+        result.id = avatar_id
         # full image is .image_url
+        img_url = QUrl(avatar_data.thumbnail_image_url)
 
-        img_url = avatar_data.thumbnail_image_url
-        request = self.network_manager.get(QNetworkRequest(QUrl(img_url)))
-        request.finished.connect(lambda req=request, s=self, res=result, cb=callback: s.finish_get_avatar_stuff(req, res, cb))
+        request = self.network_manager.get(QNetworkRequest(img_url))
+        request.finished.connect(
+            lambda
+            req=request,
+            s=self,
+            res=result,
+            cb=callback:
+            s.finish_get_avatar_stuff(req, res, cb)
+        )
         return
 
     # noinspection PyMethodMayBeStatic
