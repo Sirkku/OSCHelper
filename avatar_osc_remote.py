@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 
-from PyQt6.QtCore import Qt, QDir, QFile
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette, QColor, QAction
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QLineEdit, QSizePolicy, QVBoxLayout, QScrollArea
 

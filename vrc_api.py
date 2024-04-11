@@ -3,9 +3,8 @@ from __future__ import annotations
 from enum import Enum
 
 import vrchatapi
-from PIL.ImageQt import QImage
-from PyQt6 import QtCore
 from PyQt6.QtCore import QObject, pyqtSignal, QUrl
+from PyQt6.QtGui import QImage
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
 from vrchatapi import TwoFactorEmailCode, TwoFactorAuthCode
