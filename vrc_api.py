@@ -17,6 +17,7 @@ class AvatarData:
     def __init__(self):
         self.id: str = ""
         self.name: str = ""
+        self.user: str = ""
         self.img: Optional[QImage] = None
 
 
@@ -80,7 +81,7 @@ class VRCApiService(QObject):
             return
         self.current_user = current_user
         self.api_client = new_api_client
-        self.logged_in.emit()
+        self.logged_in.emit(True)
 
     def get_current_user(self, cached=True):
         if not cached:
@@ -100,7 +101,7 @@ class VRCApiService(QObject):
         result: AvatarData = AvatarData()
         avatar_api = vrchatapi.AvatarsApi(self.api_client)
         avatar_data = avatar_api.get_avatar(avatar_id)
-
+        result.user = self.current_user.id
         result.name = avatar_data.name
         result.id = avatar_id
         # full image is .image_url
