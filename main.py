@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-from PyQt6.QtCore import QDir
+from PyQt6.QtCore import QDir, QFile
 from PyQt6.QtNetwork import QNetworkAccessManager
 from PyQt6.QtWidgets import *
 from pythonosc import udp_client
@@ -51,7 +51,7 @@ class App:
 
     def spawn_avatar_window(self, filename: str) -> None:
         new_window = avatar_osc_remote.AvatarOSCRemote(self)
-        if filename:
+        if filename and QFile(filename).exists():
             new_window.load_file(filename)
         new_window.show()
         self.avatar_windows.append(new_window)

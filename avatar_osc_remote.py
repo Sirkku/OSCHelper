@@ -256,6 +256,7 @@ class AvatarOSCRemote(base_window.BaseWindow):
 
     def load_file(self, filename):
         with open(filename, 'r', encoding='utf-8-sig') as file:
-            j = json.load(open(filename, 'r', encoding='utf-8-sig'))
+            j = json.load(file)
             self.central_widget = AvatarWidget(self.app, j)
             self.setCentralWidget(self.central_widget)
+            return True
