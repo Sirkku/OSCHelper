@@ -93,7 +93,9 @@ class AvatarParamWidget(QWidget):
         self.callback(self.input_address, new_value)
 
     def translate_name(self) -> None:
-        translation = self.translator(self.name)
+        self.translator(self.name, self.receive_translation)
+
+    def receive_translation(self, translation):
         if translation == my_translator.MyTranslator.TRANSLATION_ERROR_SAME_LANGUAGE:
             translation = "already eng?"
         self.translation = translation
@@ -222,8 +224,8 @@ class AvatarWidget(QWidget):
     def on_value_changed(self, address, value):
         self.app.osc_client.send_message(address, value)
 
-    def translate(self, text):
-        return self.app.translator.translate(text)
+    def translate(self, text, callback):
+        return self.app.translator.translate(text, callback)
 
     def translate_all_chinese(self):
         for widget in self.param_widgets:

@@ -1,2 +1,9 @@
+# output files related to pyinstaller
 dist/
 build/
+
+# poc - proof of concept folder
+poc/
+
+# don't upload the translation cache
+translations.sqlite3
