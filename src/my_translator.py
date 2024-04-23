@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 import translate
-from PyQt6.QtCore import QThreadPool, QRunnable, pyqtSlot, QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 from PyQt6.QtGui import QAction
 
 
@@ -101,4 +101,3 @@ CREATE TABLE IF NOT EXISTS translation_cache(phrase, translation, from_lang, to_
                          )
         self.con.commit()
         callback(translation)
-

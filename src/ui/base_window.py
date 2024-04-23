@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QDir, QFile
+from PyQt6.QtCore import QDir
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMainWindow, QFileDialog
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from main import App
+from src.app import App
 
 
 class BaseWindow(QMainWindow):

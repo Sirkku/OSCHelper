@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import QSize, QDir
-from PyQt6.QtGui import QIcon, QImage, QPixmap
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton
-from PyQt6.uic.properties import QtWidgets
+from PyQt6.QtCore import QDir
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
 
-import base_window
-from vrc_api import AvatarData
+import src.ui.base_window
+from src.vrc_api import AvatarData
 
 
-class MainWindow(base_window.BaseWindow):
+class MainWindow(src.ui.base_window.BaseWindow):
     def __init__(self, app):
         super(MainWindow, self).__init__(app)
         self.setWindowTitle("Vrchat OSC Tool")

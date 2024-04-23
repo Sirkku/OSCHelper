@@ -6,29 +6,18 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette, QColor, QAction
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QLineEdit, QSizePolicy, QVBoxLayout, QScrollArea
 
-import base_window
-import my_translator
-import utils
-
-
-class OSCValueType:
-    FLOAT: str = "Float"
-    BOOL: str = "Bool"
-    INT: str = "Int"
-    UNDEFINED: str = "Undefined"
-
-    single_letter = {
-        FLOAT: "F",
-        BOOL: "B",
-        INT: "I",
-        UNDEFINED: "?"
-    }
+import src.my_translator
+import src.ui.base_window
+from src import utils
+from src.data.avatar_param import AvatarParam, OSCValueType
 
 
 class AvatarParamWidget(QWidget):
     def btn_set1_pressed(self):
+        if self.ap is None:
+            return
         new_value = None
-        match self.osc_type:
+        match self.ap.osc_type:
             case OSCValueType.FLOAT:
                 new_value = 1.0
             case OSCValueType.BOOL:
@@ -36,18 +25,20 @@ class AvatarParamWidget(QWidget):
             case OSCValueType.INT:
                 try:
                     # reduce number by one if in range
-                    new_value = int(self.value)
+                    new_value = int(self.ap.value)
                     if new_value == 255:
                         new_value = 0
                     else:
                         new_value += 1
                 except ValueError:
                     new_value = int(0)
-        self.update_value(new_value)
+        self.on_edit_by_user(new_value)
 
     def btn_set0_pressed(self):
+        if self.ap is None:
+            return
         new_value = None
-        match self.osc_type:
+        match self.ap.osc_type:
             case OSCValueType.FLOAT:
                 new_value = 0.0
             case OSCValueType.BOOL:
@@ -55,18 +46,20 @@ class AvatarParamWidget(QWidget):
             case OSCValueType.INT:
                 try:
                     # reduce number by one if in range
-                    new_value = int(self.value)
+                    new_value = int(self.ap.value)
                     if new_value == 0:
                         new_value = 255
                     else:
                         new_value -= 1
                 except ValueError:
                     new_value = int(0)
-        self.update_value(new_value)
+        self.on_edit_by_user(new_value)
 
     def lineeditupdate(self) -> None:
+        if self.ap is None:
+            return
         new_value = None
-        match self.osc_type:
+        match self.ap.osc_type:
             case OSCValueType.FLOAT:
                 try:
                     new_value = float(self.value_line_edit.text())
@@ -83,55 +76,49 @@ class AvatarParamWidget(QWidget):
                 except ValueError:
                     new_value = 0
         if new_value is not None:
-            self.update_value(new_value)
+            self.on_edit_by_user(new_value)
         else:
-            print("LineEdit for " + self.name + " wasn't converted to anything?" + self.osc_type)
+            print("LineEdit for " + self.ap.name + " wasn't converted to anything?" + self.ap.osc_type)
 
-    def update_value(self, new_value: int | bool | float) -> None:
-        self.value = new_value
+    def on_edit_by_user(self, new_value: int | bool | float) -> None:
+        if self.ap is None:
+            return
+        self.ap.value = new_value
         self.value_line_edit.setText(str(new_value))
-        self.callback(self.input_address, new_value)
+        self.callback(self.ap.input_address, new_value)
+
+    def on_update_by_remote(self, new_value: int | bool | float) -> None:
+        if self.ap is None:
+            return
+        self.ap.value = new_value
+        self.value_line_edit.setText(str(new_value))
 
     def translate_name(self) -> None:
-        self.translator(self.name, self.receive_translation)
+        if self.ap is None:
+            return
+        self.translator(self.ap.name, self.receive_translation)
 
     def receive_translation(self, translation):
-        if translation == my_translator.MyTranslator.TRANSLATION_ERROR_SAME_LANGUAGE:
+        if self.ap is None:
+            return
+        if translation == src.my_translator.MyTranslator.TRANSLATION_ERROR_SAME_LANGUAGE:
             translation = "already eng?"
-        self.translation = translation
-        self.label.setText(self.name + " (" + self.translation + ")")
+        self.ap.translation = translation
+        self.label.setText(self.ap.name + " (" + self.ap.translation + ")")
 
-    def __init__(self, json_data, call_back, translator):
+    def set_param(self, param: AvatarParam) -> None:
+        self.ap = param
+        self.osc_type_label.setText(OSCValueType.single_letter.get(self.ap.osc_type, "?"))
+        label_text = self.ap.name
+        if self.ap.translation is not None and self.ap.translation != "":
+            label_text += " (" + self.ap.translation + ")"
+        self.label.setText(label_text)
+
+    def __init__(self, avatar_param, call_back, translator):
         super().__init__()
         self.callback = call_back
         self.translator = translator
-        # default values for json data
-        self.name = ""
-        self.translation = ""
-        self.input_address = ""
-        self.output_address = ""
-        self.osc_type = OSCValueType.UNDEFINED
-
-        # try to load values from the json
-        if j_name := json_data.get('name'):
-            self.name = j_name
-        if j_input := json_data.get('input'):
-            if j_in_add := j_input.get('address'):
-                self.input_address = j_in_add
-            if j_in_type := j_input.get('type'):
-                self.osc_type = j_in_type
-        if j_output := json_data.get('output'):
-            if j_out_addr := j_output.get('address'):
-                self.output_address = j_out_addr
-            if j_out_type := j_output.get('type'):
-                self.osc_type = j_out_type
-
-        # calculate values
-        self.value = {
-            OSCValueType.INT: int(0),
-            OSCValueType.FLOAT: 0.0,
-            OSCValueType.BOOL: False
-        }.get(self.osc_type, 0.0)
+        self.ap = avatar_param
 
         # UI
         self.hbox = QHBoxLayout()
@@ -140,18 +127,18 @@ class AvatarParamWidget(QWidget):
         self.translate_btn.clicked.connect(self.translate_name)
 
         self.hbox.addWidget(self.translate_btn)
-        self.label = QLabel(self.name)
+        self.label = QLabel(self.ap.name)
         self.hbox.addWidget(self.label)
 
         self.hbox.addStretch()
 
-        self.osc_type_label = QLabel(OSCValueType.single_letter.get(self.osc_type, "?"))
+        self.osc_type_label = QLabel("?")
         self.osc_type_label.setMinimumSize(12, 24)
         self.osc_type_label.setMaximumSize(12, 24)
         self.hbox.addWidget(self.osc_type_label)
 
         self.value_line_edit = QLineEdit()
-        self.value_line_edit.setText(str(self.value))
+        self.value_line_edit.setText(str(self.ap.value))
         self.value_line_edit.setMaximumSize(72, 24)
         self.value_line_edit.editingFinished.connect(self.lineeditupdate)
         self.hbox.addWidget(self.value_line_edit)
@@ -179,14 +166,18 @@ class AvatarWidget(QWidget):
         super().__init__()
         self.app = app
         self.param_widgets = []
+        self.params = []
 
-        # Center Piece
+        # centerpiece
         vbox = QVBoxLayout()
         vbox.setSpacing(0)
 
-        for param in avatar_json["parameters"]:
-            if "input" not in param:
+        for j_param in avatar_json["parameters"]:
+            if "input" not in j_param:
                 continue
+            param = AvatarParam()
+            param.load_from_json(j_param)
+            self.params.append(param)
             new_param_widget = AvatarParamWidget(
                 param, self.on_value_changed, self.translate
             )
@@ -229,11 +220,11 @@ class AvatarWidget(QWidget):
 
     def translate_all_chinese(self):
         for widget in self.param_widgets:
-            if utils.contains_chinese(widget.name):
+            if utils.contains_chinese(widget.ap.name):
                 widget.translate_name()
 
 
-class AvatarOSCRemote(base_window.BaseWindow):
+class AvatarOSCRemote(src.ui.base_window.BaseWindow):
     translate_all_chinese: QAction
     central_widget: AvatarWidget | None
 
