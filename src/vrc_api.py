@@ -28,7 +28,8 @@ class VRCApiService(QObject):
         super(QObject, self).__init__()
         self.api_client: Optional[vrchatapi.ApiClient] = None
         self.current_user: Optional[dict] = None
-        self.user_agent: str = "OSC Helper Kvn7604"
+        self.user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
+        # "Kvn7604 kevi98@gmx.de OSCHelper/0.2.1"
         self.client_config: vrchatapi.Configuration = vrchatapi.Configuration()
         self.network_manager: QNetworkAccessManager = network_manager
 

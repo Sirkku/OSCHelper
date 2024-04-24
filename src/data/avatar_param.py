@@ -11,6 +11,7 @@ class AvatarParam:
         self.output_address = ""
         self.osc_type = OSCValueType.UNDEFINED
         self.value: int | float | bool = 0.0
+        self.selected: bool = False
 
     def load_from_json(self, json_data):
         if j_name := json_data.get('name'):
