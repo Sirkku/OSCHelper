@@ -41,7 +41,7 @@ class GoGoLocoFilter(_Filter):
     def filter(self, avatar_params: set[AvatarParam]) -> set[AvatarParam]:
         filtered_params = set()
         for param in avatar_params:
-            if not re.match("^Go/", param.name):
+            if not re.match(r"^(?:VF\d+_)?(?:Go/|OGB/|DexClone_|FaceEmo_|SB/)", param.name):
                 filtered_params.add(param)
         return filtered_params
 
@@ -71,7 +71,7 @@ class AvatarWidget(QWidget):
         """
         self.filters: set[_Filter] = set()
         """
-        list of subclasses of _Filter. These are toggleable filters
+        lis:t of subclasses of _Filter. These are toggleable filters
         """
         self.selection_filter = SelectionFilter()
         self.gogoloco_filter = GoGoLocoFilter()
