@@ -24,15 +24,19 @@ class App:
 
     def run(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("--ip", default="127.0.0.1",
-                            help="The ip of the OSC server")
-        parser.add_argument("--port", type=int, default=9000,
-                            help="The port the OSC server is listening on")
+        parser.add_argument("--recv-ip", default="127.0.0.1",
+                            help="IP from where to receive messages VRC osc messages from.", dest="ip_in")
+        parser.add_argument("--send-ip", default="127.0.0.1",
+                            help="IP of the VRChat client.", dest="ip_in")
+        parser.add_argument("--send-port", type=int, default=9000,
+                            help="Port to send osc messages to VRC", dest="port_out")
+        parser.add_argument("--recv-port", type=int, default=9001,
+                            help="Port to receive osc messages from VRC", dest="port_in")
         args = parser.parse_args()
 
         self.network_manager = QNetworkAccessManager()
 
-        self.osc_client = udp_client.SimpleUDPClient(args.ip, args.port)
+        self.osc_client = udp_client.SimpleUDPClient(args.ip_out, args.port_out)
         self.translator = src.my_translator.MyTranslator()
         self.vrca = vrc_api.VRCApiService(self.network_manager)
 
