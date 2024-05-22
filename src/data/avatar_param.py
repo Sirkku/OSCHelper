@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src.vrc_osc import OSCValueType
+
 
 class AvatarParam:
     def __init__(self):
@@ -33,17 +35,3 @@ class AvatarParam:
             OSCValueType.FLOAT: 0.0,
             OSCValueType.BOOL: False
         }.get(self.osc_type, 0.0)
-
-
-class OSCValueType:
-    FLOAT: str = "Float"
-    BOOL: str = "Bool"
-    INT: str = "Int"
-    UNDEFINED: str = "Undefined"
-
-    single_letter = {
-        FLOAT: "F",
-        BOOL: "B",
-        INT: "I",
-        UNDEFINED: "?"
-    }
