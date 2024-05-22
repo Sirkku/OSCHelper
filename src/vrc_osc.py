@@ -1,6 +1,6 @@
 import struct
 from enum import Enum
-from typing import Optional
+from typing import Optional, Callable
 
 from PyQt6.QtCore import QObject, QByteArray
 from PyQt6.QtNetwork import QUdpSocket, QHostAddress
@@ -24,18 +24,25 @@ type OscMessage = tuple[str, OSCValueType, bool | float | int]
 
 
 class VrcOscService(QObject):
+    """
+
+    """
     def __init__(self):
-        super(QObject).__super__()
+        super(QObject, self).__init__()
+        self.out_port: int = 9000
+        self.out_ip: QHostAddress = QHostAddress("127.0.0.1")
+        self.in_port: int = 9001
+        self.in_ip: QHostAddress = QHostAddress("127.0.0.1")
+        self.handler: Optional[Callable[[OscMessage], None]] = None
         self.udp_socket = QUdpSocket(self)
-        self.udp_socket.bind(QHostAddress.LocalHost, 7755)
 
-        self.udp_socket.readyRead.connect(self.readPendingDatagrams)
+        self.udp_socket.readyRead.connect(self.read_pending_datagrams)
 
-    def send(self, path, value):
-        # construct osc message here
-        pass
+    def send(self, path, value_type, value):
+        osc_bytes = self.encode_osc_message((path, value_type, value))
+        self.udp_socket.writeDatagram(osc_bytes, self.out_ip, self.out_port)
 
-    def readPendingDatagrams(self):
+    def read_pending_datagrams(self):
         while self.udp_socket.hasPendingDatagrams():
             data: bytes
             (data, _, _) = self.udp_socket.readDatagram(1024)
@@ -43,8 +50,21 @@ class VrcOscService(QObject):
             if osc_msg is None:
                 return
 
-    def process(self, path: str, value_type: OSCValueType, value: float | int | bool):
-        pass
+            if self.handler is not None:
+                self.handler(osc_msg)
+
+    def set_handler(self, handler: Callable[[OscMessage], None]) -> None:
+        self.handler = handler
+
+    def connect(self, in_addr: QHostAddress, in_port: int, out_addr: QHostAddress, out_port: int):
+        self.in_ip = in_addr
+        self.in_port = in_port
+
+        self.out_ip = out_addr
+        self.out_port = out_port
+
+        self.udp_socket.bind(self.in_ip, self.in_port)
+
 
     @staticmethod
     def encode_osc_message(osc_msg: OscMessage) -> bytes:
