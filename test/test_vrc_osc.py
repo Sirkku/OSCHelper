@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from src.vrc_osc import OSCValueType, VrcOscService
 
-# \u8863\u670d = 衣服
+# \u8863\u670d = 衣服 are chinese characters used by many avatars. Proper handling is necessary
 encoding_data: list[tuple[bytes, str, OSCValueType, bool | float | int]] = [
     (
         b"\x2f\x61\x76\x61\x74\x61\x72\x2f"
@@ -35,6 +35,10 @@ encoding_data: list[tuple[bytes, str, OSCValueType, bool | float | int]] = [
         OSCValueType.INT,
         -1
     ), (
+        # example:
+        # /avatar/parameters/\u5934\u53d1 <NUL+Padding>
+        # ,f <NUL+Padding>
+        # <32b float>
         b"\x2f\x61\x76\x61\x74\x61\x72\x2f"
         b"\x70\x61\x72\x61\x6d\x65\x74\x65"
         b"\x72\x73\x2f\x5c\x75\x35\x39\x33"

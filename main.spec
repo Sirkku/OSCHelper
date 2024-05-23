@@ -21,7 +21,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='OSC Tool v1.3.1',
+    name='OSC Tool v1.4.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

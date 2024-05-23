@@ -2,62 +2,83 @@ from __future__ import annotations
 
 import argparse
 import os
+from typing import Optional, Callable
 
-from PyQt6.QtCore import QFile, QDir
-from PyQt6.QtNetwork import QNetworkAccessManager
+from PyQt6.QtCore import QFile, QDir, QObject
+from PyQt6.QtNetwork import QNetworkAccessManager, QHostAddress
 from pythonosc import udp_client
 
-import src.my_translator
-import src.ui.main_window
-from src import vrc_api
-from src.ui import avatar_osc_remote
+from src.my_translator import MyTranslator
+from src.ui.main_window import MainWindow
+from src.vrc_api import VRCApiService
+from src.ui.avatar_osc_remote import AvatarOSCRemote
+from src.vrc_osc import VrcOscService, OscMessage
+
+
+
 
 
 class App:
-    def __init__(self):
-        self.osc_client: udp_client.SimpleUDPClient | None = None
-        self.translator: src.my_translator.MyTranslator | None = None
-        self.vrca: vrc_api.VRCApiService | None = None
-        self.mw: src.ui.main_window.MainWindow | None = None
-        self.network_manager: QNetworkAccessManager | None = None
-        self.avatar_windows = []
+    """
+    Holds all singletons and a list of all windows. Responsible for wiring the dependencies.
 
-    def run(self):
+    In this project ...Service most likely means a singleton single purpose class that is independent and
+    needs to be passed to app logic components
+    """
+    def __init__(self):
+        self.avatar_windows: list[AvatarOSCRemote] = []
+
         parser = argparse.ArgumentParser()
         parser.add_argument("--recv-ip", default="127.0.0.1",
                             help="IP from where to receive messages VRC osc messages from.", dest="ip_in")
         parser.add_argument("--send-ip", default="127.0.0.1",
-                            help="IP of the VRChat client.", dest="ip_in")
+                            help="IP of the VRChat client.", dest="ip_out")
         parser.add_argument("--send-port", type=int, default=9000,
                             help="Port to send osc messages to VRC", dest="port_out")
         parser.add_argument("--recv-port", type=int, default=9001,
                             help="Port to receive osc messages from VRC", dest="port_in")
         args = parser.parse_args()
 
-        self.network_manager = QNetworkAccessManager()
+        self.network_manager: QNetworkAccessManager = QNetworkAccessManager()
 
-        self.osc_client = udp_client.SimpleUDPClient(args.ip_out, args.port_out)
-        self.translator = src.my_translator.MyTranslator()
-        self.vrca = vrc_api.VRCApiService(self.network_manager)
+        self.osc_client: udp_client.SimpleUDPClient = udp_client.SimpleUDPClient(args.ip_out, args.port_out)
+        self.translator: MyTranslator = MyTranslator()
+        self.vrca: VRCApiService = VRCApiService(self.network_manager)
 
-        self.mw = src.ui.main_window.MainWindow(self)
+        self.osc_service: VrcOscService = VrcOscService()
+        self.osc_subscriber: set[Callable[[OscMessage], None]] = set()
+        self.osc_service.set_handler(self._osc_handler)
+        self.osc_service.connect(QHostAddress(args.ip_in), args.port_in, QHostAddress(args.ip_out), args.port_out)
 
+        self.mw: MainWindow = MainWindow(self)
         self.vrca.logged_in.connect(self.mw.on_login)
         self.vrca.interactive_login_user()
-
-        # client.send_message("/avatar/parameters/fluff/dps/penetrator", True)
-        # %Appdata%\..\LocalLow\VRCHat\vrchat\OSC\
 
         self.mw.show()
 
     def spawn_avatar_window(self, filename: str) -> None:
-        new_window = avatar_osc_remote.AvatarOSCRemote(self)
+        new_window = AvatarOSCRemote(self)
         if filename and QFile(filename).exists():
             new_window.load_file(filename)
         new_window.show()
         self.avatar_windows.append(new_window)
 
-    # noinspection PyMethodMayBeStatic
-    def get_osc_directory(self) -> str:
+    def subscribe_osc(self, handler: Callable[[OscMessage], None]):
+        self.osc_subscriber.add(handler)
+
+    def unsubscribe_osc(self, handler: Callable[[OscMessage], None]):
+        self.osc_subscriber.remove(handler)
+
+    def _osc_handler(self, msg: OscMessage) -> None:
+        for handler in self.osc_subscriber:
+            try:
+                handler(msg)
+            except Exception as e:
+                print("Error while dispatching OSC Message")
+                print(e)
+
+    @staticmethod
+    def get_osc_directory() -> str:
+        # TODO: Consider making it multiplatform
         osc_dir = QDir(os.environ["APPDATA"] + "\\..\\LocalLow\\VRChat\\VRChat\\OSC\\")
         return osc_dir.absolutePath()

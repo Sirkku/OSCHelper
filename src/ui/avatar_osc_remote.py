@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from PyQt6.QtGui import QAction
+from src.vrc_osc import OscMessage
 
 import src.ui.base_window
 from src.ui.avatar_widget import AvatarWidget, _Filter
@@ -21,14 +22,15 @@ class ToggleFilterQAction(QAction):
         self.filter.filter_toggled.emit()
 
 
-
-
 class AvatarOSCRemote(src.ui.base_window.BaseWindow):
+    """
+    The window that contains the OSC remote controls and views.
+    """
     translate_all_chinese: QAction
     central_widget: AvatarWidget | None
 
     def __init__(self, app):
-        super(AvatarOSCRemote, self).__init__(app)
+        super().__init__(app)
         self.setWindowTitle("Vrchat OSC Tool")
         self.osc_client = app.osc_client
         self.central_widget = None
@@ -40,6 +42,11 @@ class AvatarOSCRemote(src.ui.base_window.BaseWindow):
         self.translate_all_chinese = QAction("Translate all chinese")
         self.translate_all_chinese.triggered.connect(self.translate_all_chinese_action)
         self.tool_menu.addAction(self.translate_all_chinese)
+        self.app.subscribe_osc(self.receive_osc_message)
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.app.unsubscribe_osc(self.receive_osc_message)
 
     def translate_all_chinese_action(self):
         if self.central_widget:
@@ -47,6 +54,10 @@ class AvatarOSCRemote(src.ui.base_window.BaseWindow):
 
     def send_osc_message(self, address, value):
         self.osc_client.send_message(address, value)
+
+    def receive_osc_message(self, osc_msg: OscMessage):
+        if self.central_widget:
+            self.central_widget.receive_osc_message(osc_msg)
 
     def load_file(self, filename):
         with open(filename, 'r', encoding='utf-8-sig') as file:
@@ -60,6 +71,7 @@ class AvatarOSCRemote(src.ui.base_window.BaseWindow):
             for f in self.central_widget.filters:
                 f: _Filter
                 new_tfqa = ToggleFilterQAction(self.central_widget, f)
+                new_tfqa.setChecked(f.default_state())
                 self.filter_actions.append(new_tfqa)
                 self.filter_menu.addAction(new_tfqa)
 

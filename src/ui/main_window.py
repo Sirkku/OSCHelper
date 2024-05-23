@@ -6,11 +6,14 @@ from PyQt6.QtCore import QDir
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
 
-import src.ui.base_window
+from src.ui.base_window import BaseWindow
 from src.vrc_api import AvatarData
 
 
-class MainWindow(src.ui.base_window.BaseWindow):
+class MainWindow(BaseWindow):
+    """
+
+    """
     def __init__(self, app):
         super(MainWindow, self).__init__(app)
         self.setWindowTitle("Vrchat OSC Tool")
