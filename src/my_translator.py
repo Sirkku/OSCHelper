@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Callable, Optional
 
 import translate
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS translation_cache(phrase, translation, from_lang, to_
         self.from_lang = from_lang
         self._recreate_translator()
 
-    def translate(self, text, callback=None):
+    def translate(self, text: str,
+                  callback: Callable[[str], None]):
         """
         Translate the given text with the current settings of the translator.
 

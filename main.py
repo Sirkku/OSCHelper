@@ -1,12 +1,14 @@
 from __future__ import annotations
 import sys
 from PyQt6.QtWidgets import *
-from src.app import App
+import src.app
 
 
 def main():
+
+
     app = QApplication(sys.argv)
-    my_app = App()
+    my_app = src.app.App()
     sys.exit(app.exec())
 
 

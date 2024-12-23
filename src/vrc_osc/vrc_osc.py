@@ -1,12 +1,12 @@
 import struct
-from enum import Enum
+import typing
 from typing import Optional, Callable
 
-from PyQt6.QtCore import QObject, QByteArray
+from PyQt6.QtCore import QObject
 from PyQt6.QtNetwork import QUdpSocket, QHostAddress
 
 
-class OSCValueType():
+class OSCValueType:
     FLOAT: str = "Float"
     BOOL: str = "Bool"
     INT: str = "Int"
@@ -20,7 +20,9 @@ class OSCValueType():
     }
 
 
-type OscMessage = tuple[str, OSCValueType, bool | float | int]
+type OscPyTypes = typing.Union[bool | float | int]
+
+type OscMessage = tuple[str, str, OscPyTypes]
 
 
 def print_to_stdout_handler(osc_msg: OscMessage) -> None:
@@ -84,8 +86,6 @@ class VrcOscService(QObject):
 
      Usage:
      Call set_handler and then connect. Packages are now received and handled via Qt Event system.
-
-
     """
 
     def __init__(self):
@@ -96,7 +96,6 @@ class VrcOscService(QObject):
         self.in_ip: QHostAddress = QHostAddress("127.0.0.1")
         self.handler: Optional[Callable[[OscMessage], None]] = None
         self.udp_socket = QUdpSocket(self)
-
         self.udp_socket.readyRead.connect(self._read_pending_diagrams)
 
     def send(self, path, value_type, value):
@@ -109,10 +108,8 @@ class VrcOscService(QObject):
     def connect(self, in_addr: QHostAddress, in_port: int, out_addr: QHostAddress, out_port: int):
         self.in_ip = in_addr
         self.in_port = in_port
-
         self.out_ip = out_addr
         self.out_port = out_port
-
         self.udp_socket.bind(self.in_ip, self.in_port)
 
     def _read_pending_diagrams(self):

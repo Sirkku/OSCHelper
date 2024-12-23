@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http.cookiejar import LWPCookieJar
 from typing import Optional, Callable
 
 import vrchatapi
@@ -29,7 +30,6 @@ class VRCApiService(QObject):
         self.api_client: Optional[vrchatapi.ApiClient] = None
         self.current_user: Optional[dict] = None
         self.user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
-        # "Kvn7604 kevi98@gmx.de OSCHelper/0.2.1"
         self.client_config: vrchatapi.Configuration = vrchatapi.Configuration()
         self.network_manager: QNetworkAccessManager = network_manager
 
@@ -41,11 +41,19 @@ class VRCApiService(QObject):
         the rest are passed through.
         :return:
         """
-        self.client_config.username = QInputDialog().getText(None, "Username", "Enter")[0]
-        self.client_config.password = QInputDialog().getText(None, "Password", "Enter")[0]
+        self.client_config.username = QInputDialog().getText(None, "VRChat E-Mail", "Enter")[0]
+        self.client_config.password = QInputDialog().getText(None, "VRChat Password", "Enter")[0]
 
         new_api_client = vrchatapi.ApiClient(self.client_config)
         new_api_client.user_agent = self.user_agent
+
+        cookie_jar = LWPCookieJar("auth.txt")
+        try:
+            cookie_jar.load()
+            for cookie in cookie_jar:
+                new_api_client.rest_client.cookie_jar.set_cookie(cookie)
+        except FileNotFoundError:
+            cookie_jar.save()
 
         auth_api = authentication_api.AuthenticationApi(new_api_client)
         current_user = None
@@ -81,6 +89,113 @@ class VRCApiService(QObject):
             return
         self.current_user = current_user
         self.api_client = new_api_client
+
+        for cookie in new_api_client.rest_client.cookie_jar:
+            if cookie.name == "twoFactorAuth":
+                continue
+            cookie_jar.set_cookie(cookie)
+        cookie_jar.save()
+
+        self.logged_in.emit(True)
+
+        def interactive_login_user(self):
+            """
+            Tries to log in the user. On success emits self.logged_in.
+            Silences all exceptions deemed to only have been caused by wrong
+            Username/Password/2FA Code input,
+            the rest are passed through.
+            :return:
+            """
+            self.client_config.username = QInputDialog().getText(None, "VRChat E-Mail", "Enter")[0]
+            self.client_config.password = QInputDialog().getText(None, "VRChat Password", "Enter")[0]
+
+            new_api_client = vrchatapi.ApiClient(self.client_config)
+            new_api_client.user_agent = self.user_agent
+
+            cookie_jar = LWPCookieJar("auth.txt")
+            try:
+                cookie_jar.load()
+                for cookie in cookie_jar:
+                    new_api_client.rest_client.cookie_jar.set_cookie(cookie)
+            except FileNotFoundError:
+                cookie_jar.save()
+
+            auth_api = authentication_api.AuthenticationApi(new_api_client)
+            current_user = None
+
+            try:
+                current_user = auth_api.get_current_user()
+            except UnauthorizedException as e:
+                # check if 2FA is requested
+                if e.status == 200:
+                    # if the follow call also throws, the 2FA code was wrong. Refactor later?
+                    try:
+                        if "Email 2 Factor Authentication" in e.reason:
+                            auth_api.verify2_fa_email_code(two_factor_email_code=TwoFactorEmailCode(
+                                QInputDialog().getText(None, "2FA Code", "Enter")[0]
+                            ))
+                        elif "2 Factor Authentication" in e.reason:
+                            auth_api.verify2_fa(two_factor_auth_code=TwoFactorAuthCode(
+                                QInputDialog().getText(None, "2FA Code", "Enter")[0]
+                            ))
+                    except vrchatapi.exceptions.ApiException as _:
+                        self.logged_in.emit(False)
+                        return
+                    current_user = auth_api.get_current_user()
+                else:
+                    # failure wasn't related to 2FA?
+
+                    QMessageBox.warning(None, "Error while logging in:", "{}".format(str(e)))
+                    return
+            except vrchatapi.ApiException as e:
+                # failure wasn't related to logging in?
+                QMessageBox.warning(None, "Error while logging in:", "{}".format(str(e)))
+                self.logged_in.emit(False)
+                return
+            self.current_user = current_user
+            self.api_client = new_api_client
+
+            for cookie in new_api_client.rest_client.cookie_jar:
+                if cookie.name == "twoFactorAuth":
+                    continue
+                cookie_jar.set_cookie(cookie)
+            cookie_jar.save()
+
+            self.logged_in.emit(True)
+
+    def fast_login(self):
+        new_api_client = vrchatapi.ApiClient(self.client_config)
+        new_api_client.user_agent = self.user_agent
+
+        cookie_jar = LWPCookieJar("auth.txt")
+        try:
+            cookie_jar.load()
+            for cookie in cookie_jar:
+                new_api_client.rest_client.cookie_jar.set_cookie(cookie)
+        except FileNotFoundError:
+            cookie_jar.save()
+
+        auth_api = authentication_api.AuthenticationApi(new_api_client)
+        current_user = None
+
+        try:
+            current_user = auth_api.get_current_user()
+        except UnauthorizedException as e:
+            self.interactive_login_user()
+            return
+        except Exception as e:
+            # failure wasn't related to logging in?
+            QMessageBox.warning(None, "Error while logging in:", "{}".format(str(e)))
+            self.logged_in.emit(False)
+            return
+        self.current_user = current_user
+        self.api_client = new_api_client
+        for cookie in new_api_client.rest_client.cookie_jar:
+            if cookie.name == "twoFactorAuth":
+                continue
+            cookie_jar.set_cookie(cookie)
+        cookie_jar.save()
+
         self.logged_in.emit(True)
 
     def get_current_user(self, cached=True):
@@ -110,10 +225,10 @@ class VRCApiService(QObject):
         request = self.network_manager.get(QNetworkRequest(img_url))
         request.finished.connect(
             lambda
-            req=request,
-            s=self,
-            res=result,
-            cb=callback:
+                req=request,
+                s=self,
+                res=result,
+                cb=callback:
             s.finish_get_avatar_stuff(req, res, cb)
         )
         return

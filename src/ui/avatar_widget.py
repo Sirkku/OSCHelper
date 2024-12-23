@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import re
+import typing
 
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QHBoxLayout
-from src.vrc_osc import OscMessage
 
 from src import utils
-from src.data.avatar_param import AvatarParam
+from src.my_translator import MyTranslator
+from src.vrc_osc.avatar import Avatar, AvatarParam
 from src.ui.avatar_param_widget import AvatarParamWidget
 
 
@@ -67,20 +68,17 @@ class InputOnlyFilter(_Filter):
     def default_state(self) -> bool:
         return True
 
+
 class AvatarWidget(QWidget):
-    def __init__(self, app, avatar_json):
-        super().__init__()
+    def __init__(self, my_translator: MyTranslator, avatar: Avatar, parent=None) -> None:
+        super().__init__(parent)
+        self.avatar = avatar
         self.tracked_osc_widgets: dict[str, AvatarParamWidget] = {}
         """
         A list of all widgets that receive updates from vrchat. 
         """
-        self.app = app
-        self.params: set[AvatarParam] = set()
-        """
-        Represents all osc-related parameters of an avatar
-        
-        -> *.param_selection* contains the currently displayed parameters
-        """
+        self.my_translator = my_translator
+
         self.param_selection: list[AvatarParam] = []
         """
         contains the currently displayed osc-related parameters. basically a 
@@ -109,14 +107,6 @@ class AvatarWidget(QWidget):
         self.vbox = QVBoxLayout()
         self.vbox.setSpacing(0)
 
-        for j_param in avatar_json["parameters"]:
-            # if "input" not in j_param:
-            #    continue
-            param = AvatarParam()
-            param.load_from_json(j_param)
-            self.params.add(param)
-            self.param_selection.append(param)
-
         # Add Scroll Bar
         self.dummy_widget = QWidget()
         self.dummy_widget.setLayout(self.vbox)
@@ -142,11 +132,10 @@ class AvatarWidget(QWidget):
         """
         Recreate the ui based on self.param_selection
         """
-        selection = self.params
+        selection = self.avatar.param_map.values()
         for f in [f for f in self.filters if f.active]:
             selection = f.filter(selection)
-        self.param_selection = list(selection)
-        self.param_selection.sort(key=lambda ap: ap.name)
+        self.param_selection = sorted(selection, key=lambda ap: ap.name)
 
         for widget in self.param_widgets:
             self.vbox.removeWidget(widget)
@@ -157,7 +146,7 @@ class AvatarWidget(QWidget):
         for param in self.param_selection:
             # create
             new_param_widget = AvatarParamWidget(
-                param, self.on_value_changed, self.translate
+                param, self.translate
             )
 
             # stylize
@@ -175,19 +164,10 @@ class AvatarWidget(QWidget):
                 self.tracked_osc_widgets[param.output_address] = new_param_widget
         return
 
-    def on_value_changed(self, address, value):
-        self.app.osc_client.send_message(address, value)
-
-    def translate(self, text, callback):
-        return self.app.translator.translate(text, callback)
+    def translate(self, text: str, callback: typing.Callable[[str], None]):
+        return self.my_translator.translate(text, callback)
 
     def translate_all_chinese(self):
         for widget in self.param_widgets:
             if utils.contains_chinese(widget.ap.name):
                 widget.translate_name()
-
-    def receive_osc_message(self, osc_msg: OscMessage):
-        osc_path, _, osc_value = osc_msg
-        widget = self.tracked_osc_widgets.get(osc_path)
-        if widget:
-            widget.on_update_by_vrchat(osc_value)

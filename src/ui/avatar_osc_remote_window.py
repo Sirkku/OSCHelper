@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import json
+from typing import Optional
 
 from PyQt6.QtGui import QAction
-from src.vrc_osc import OscMessage
+
+from src.vrc_osc.avatar import Avatar
+from src.vrc_osc.vrc_osc import OscMessage, VrcOscService
 
 import src.ui.base_window
 from src.ui.avatar_widget import AvatarWidget, _Filter
@@ -22,18 +24,18 @@ class ToggleFilterQAction(QAction):
         self.filter.filter_toggled.emit()
 
 
-class AvatarOSCRemote(src.ui.base_window.BaseWindow):
+class AvatarOSCRemoteWindow(src.ui.base_window.BaseWindow):
     """
     The window that contains the OSC remote controls and views.
     """
     translate_all_chinese: QAction
     central_widget: AvatarWidget | None
 
-    def __init__(self, app):
-        super().__init__(app)
+    def __init__(self, app, avatar: Avatar):
+        super().__init__(app.translator)
+        self.app = app
         self.setWindowTitle("Vrchat OSC Tool")
-        self.osc_client = app.osc_client
-        self.central_widget = None
+        self.central_widget: Optional[AvatarWidget] = None
         menu_bar = self.menuBar()
         self.tool_menu = menu_bar.addMenu("Tools")
         self.filter_menu = menu_bar.addMenu("Filter")
@@ -42,38 +44,29 @@ class AvatarOSCRemote(src.ui.base_window.BaseWindow):
         self.translate_all_chinese = QAction("Translate all chinese")
         self.translate_all_chinese.triggered.connect(self.translate_all_chinese_action)
         self.tool_menu.addAction(self.translate_all_chinese)
-        self.app.subscribe_osc(self.receive_osc_message)
+
+        self.set_avatar(avatar)
 
     def closeEvent(self, event):
         super().closeEvent(event)
-        self.app.unsubscribe_osc(self.receive_osc_message)
 
     def translate_all_chinese_action(self):
         if self.central_widget:
             self.central_widget.translate_all_chinese()
 
-    def send_osc_message(self, address, value):
-        self.osc_client.send_message(address, value)
+    def set_avatar(self, avatar: Avatar):
+        if self.central_widget is not None:
+            for tfqa in self.filter_actions:
+                self.filter_menu.removeAction(tfqa)
 
-    def receive_osc_message(self, osc_msg: OscMessage):
-        if self.central_widget:
-            self.central_widget.receive_osc_message(osc_msg)
+        self.central_widget = AvatarWidget(self.app.translator, avatar)
 
-    def load_file(self, filename):
-        with open(filename, 'r', encoding='utf-8-sig') as file:
-            j = json.load(file)
+        for f in self.central_widget.filters:
+            f: _Filter
+            new_tfqa = ToggleFilterQAction(self.central_widget, f)
+            new_tfqa.setChecked(f.default_state())
+            self.filter_actions.append(new_tfqa)
+            self.filter_menu.addAction(new_tfqa)
 
-            if self.central_widget is not None:
-                for tfqa in self.filter_actions:
-                    self.filter_menu.removeAction(tfqa)
-            self.central_widget = AvatarWidget(self.app, j)
-
-            for f in self.central_widget.filters:
-                f: _Filter
-                new_tfqa = ToggleFilterQAction(self.central_widget, f)
-                new_tfqa.setChecked(f.default_state())
-                self.filter_actions.append(new_tfqa)
-                self.filter_menu.addAction(new_tfqa)
-
-            self.setCentralWidget(self.central_widget)
-            return True
+        self.setCentralWidget(self.central_widget)
+        return True

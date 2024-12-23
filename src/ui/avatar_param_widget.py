@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Callable
 
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QLineEdit, QSizePolicy, QCheckBox
 
 import src.my_translator
-from src.data.avatar_param import OSCValueType, AvatarParam
+from src.vrc_osc.avatar import AvatarParam, OSCValueType
 
 
 class AvatarParamWidget(QWidget):
-    # region ui-callbacks
-
     def btn_set1_pressed(self):
         if self.ap is None:
             return
@@ -22,7 +20,7 @@ class AvatarParamWidget(QWidget):
                 new_value = True
             case OSCValueType.INT:
                 try:
-                    # reduce number by one if in range
+                    # increase by one and wrap around
                     new_value = int(self.ap.value)
                     if new_value == 255:
                         new_value = 0
@@ -30,7 +28,7 @@ class AvatarParamWidget(QWidget):
                         new_value += 1
                 except ValueError:
                     new_value = int(0)
-        self.on_edit_by_user(new_value)
+        self.ap.value = new_value
 
     def btn_set0_pressed(self):
         if self.ap is None:
@@ -43,7 +41,7 @@ class AvatarParamWidget(QWidget):
                 new_value = False
             case OSCValueType.INT:
                 try:
-                    # reduce number by one if in range
+                    # reduce by one and wrap around
                     new_value = int(self.ap.value)
                     if new_value == 0:
                         new_value = 255
@@ -51,7 +49,7 @@ class AvatarParamWidget(QWidget):
                         new_value -= 1
                 except ValueError:
                     new_value = int(0)
-        self.on_edit_by_user(new_value)
+        self.ap.value = new_value
 
     def on_line_edit_edit_finished(self) -> None:
         if self.ap is None:
@@ -74,7 +72,7 @@ class AvatarParamWidget(QWidget):
                 except ValueError:
                     new_value = 0
         if new_value is not None:
-            self.on_edit_by_user(new_value)
+            self.ap.value = new_value
         else:
             print("LineEdit for " + self.ap.name + " wasn't converted to anything?" + self.ap.osc_type)
 
@@ -86,35 +84,17 @@ class AvatarParamWidget(QWidget):
             return
         self.translator(self.ap.name, self._receive_translation)
 
-    # endregion
-
-    def on_edit_by_user(self, new_value: int | bool | float) -> None:
-        """
-        Handle value changes caused by the user. Compare to on_update_by_vrchat
-        1. store new value in data/ui
-        2. send new value to vrchat
-        """
-        if self.ap is None:
-            return
-        self.ap.value = new_value
-        self.value_line_edit.setText(str(new_value))
-        if self.ap.input_address:
-            self.callback(self.ap.input_address, new_value)
-
-    def on_update_by_vrchat(self, new_value: int | bool | float) -> None:
+    def on_value_update(self, new_value) -> None:
         """
         Handle value changes received by on_update_by_vrchat. Compare to on_edit_by_user
         1. store new value in data/ui
         """
-        if self.ap is None:
-            return
-        # Assume VRChat doesn't send us mismatching properties. :)
-        # Laughs in obscure bug created by vrc in 5 months
-        self.ap.value = new_value
-        if isinstance(new_value, float):
-            self.value_line_edit.setText("{:.7f}".format(new_value))
+        new_text = ""
+        if self.ap.osc_type == OSCValueType.FLOAT:
+            new_text = "{:.7f}".format(new_value)
         else:
-            self.value_line_edit.setText(str(new_value))
+            new_text = str(new_value)
+        self.value_line_edit.setText(new_text)
 
     def _receive_translation(self, translation):
         if self.ap is None:
@@ -125,10 +105,13 @@ class AvatarParamWidget(QWidget):
         self._set_label_text()
 
     def set_param(self, param: AvatarParam) -> None:
+        if self.ap is not None:
+            self.ap.unsubscribe(self.on_value_update)
         self.ap = param
         self.osc_type_label.setText(OSCValueType.single_letter.get(self.ap.osc_type, "?"))
         self._set_label_text()
         self.select_box.setChecked(self.ap.selected)
+        self.ap.subscribe(self.on_value_update)
 
     def _set_label_text(self):
         label_text = self.ap.name
@@ -138,12 +121,13 @@ class AvatarParamWidget(QWidget):
             label_text += " [RO]"
         self.label.setText(label_text)
 
-    def __init__(self, avatar_param, call_back, translator):
+    def __init__(self,
+                 avatar_param: AvatarParam,
+                 translator: Callable[[str, Callable[[str], None]], None]):
         super().__init__()
         self.ap: Optional[AvatarParam] = None
-        self.callback = call_back
         self.translator = translator
-        # defer self.ap until ui creation
+        # defer self.ap until after ui creation
 
         self.hbox = QHBoxLayout()
 
@@ -191,3 +175,7 @@ class AvatarParamWidget(QWidget):
         self.setLayout(self.hbox)
 
         self.set_param(avatar_param)
+        self.ap.subscribe(self.on_value_update)
+
+    def __del__(self):
+        self.ap.unsubscribe(self.on_value_update)
